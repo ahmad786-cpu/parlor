@@ -6,7 +6,8 @@ export const metadata: Metadata = {
   title: 'Parlor',
   description: 'Create AI personalities and talk to them by voice.',
 };
-export const viewport: Viewport = { width: 'device-width', initialScale: 1, themeColor: '#03091a' };
+// viewportFit: 'cover' lets the message box sit above the iPhone home bar (env(safe-area-inset-bottom)).
+export const viewport: Viewport = { width: 'device-width', initialScale: 1, viewportFit: 'cover', themeColor: '#03091a' };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
