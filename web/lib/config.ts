@@ -1,6 +1,6 @@
 export const CATEGORIES = ['Companion', 'Education', 'Games', 'Home', 'Role play', 'Work', 'Other'];
 
-export const COLORS = ['#4A3FD6', '#2F7DD1', '#0E8F7E', '#3C8A3F', '#E08A1E', '#C2452D', '#D9367A', '#7A4FBF'];
+export const COLORS = ['#18B5FF', '#4A3FD6', '#2F7DD1', '#0E8F7E', '#3C8A3F', '#E08A1E', '#C2452D', '#D9367A', '#7A4FBF'];
 
 export const LANGUAGES = [
   { code: 'en-US', label: 'English (US)' },

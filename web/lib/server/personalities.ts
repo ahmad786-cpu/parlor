@@ -28,7 +28,7 @@ export function sanitize(input: Record<string, unknown>) {
     greeting: str(input.greeting, 300),
     category: CATEGORIES.includes(category) ? category : 'Other',
     emoji: str(input.emoji, 8) || '🙂',
-    color: /^#[0-9a-fA-F]{6}$/.test(color) ? color : '#4A3FD6',
+    color: /^#[0-9a-fA-F]{6}$/.test(color) ? color : '#18B5FF',
     voice: {
       name: str(v.name, 120),
       lang: /^[a-zA-Z]{2,3}(-[a-zA-Z0-9]{2,4})?$/.test(lang) ? lang : 'en-US',

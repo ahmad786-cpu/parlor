@@ -6,7 +6,7 @@ export const metadata: Metadata = {
   title: 'Parlor',
   description: 'Create AI personalities and talk to them by voice.',
 };
-export const viewport: Viewport = { width: 'device-width', initialScale: 1 };
+export const viewport: Viewport = { width: 'device-width', initialScale: 1, themeColor: '#03091a' };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
