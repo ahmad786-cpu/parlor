@@ -207,7 +207,7 @@ h3 { font: 700 1.2rem/1.2 var(--display); }
 @keyframes talk { from { transform: scale(1); } to { transform: scale(1.07); } }
 @keyframes spin { to { transform: rotate(360deg); } }
 
-.talk { display: grid; gap: 1rem; min-width: 0; }
+.talk { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1rem; min-width: 0; }
 .log {
   display: flex; flex-direction: column; gap: 0.9rem;
   min-height: 22rem; max-height: 62vh; overflow-y: auto;
@@ -304,6 +304,17 @@ h3 { font: 700 1.2rem/1.2 var(--display); }
   .rail-user .link-btn { display: inline-flex; align-items: center; min-height: 40px; }
   .cast { gap: 1.75rem; }
   .history summary { padding: 0.9rem 1rem; }
+}
+
+/* Embedded in another site (?embed=1) ------------------------------------
+   The host page sizes the frame to the content (see the height messages in personality-demo), so
+   nothing here may depend on the frame's height: no vh units, no sticky bars. */
+.bare-main.embed { padding: 0; max-width: none; }
+.embed .stage { position: static; }
+.embed .log { max-height: 26rem; }
+.embed .composer { position: static; padding: 0; border-top: 0; background: none; }
+@media (max-width: 860px) {
+  .embed .log { min-height: 10rem; max-height: 22rem; }
 }
 
 @media (prefers-reduced-motion: reduce) {

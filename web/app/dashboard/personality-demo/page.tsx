@@ -49,9 +49,30 @@ export default function PersonalityDemo() {
     }
   }, []);
 
+  // Embedded: tell the host page how tall the content is, so it can size the frame to fit
+  // (the portfolio listens for { type: 'parlor:height' }). Only a number is shared.
+  useEffect(() => {
+    if (!embedded || typeof ResizeObserver === 'undefined') return;
+    let last = 0;
+    const report = () => {
+      // The content's own height: the document's height is never less than the frame, so it could not shrink.
+      const height = Math.ceil(document.body.getBoundingClientRect().height);
+      if (height === last) return;
+      last = height;
+      window.parent.postMessage({ type: 'parlor:height', height }, '*');
+    };
+    const observer = new ResizeObserver(report);
+    observer.observe(document.body);
+    report();
+    return () => observer.disconnect();
+  }, [embedded]);
+
   function startCall() {
     if (embedded) {
-      window.open(window.location.href, '_blank', 'noopener');
+      // The call opens as the normal full page in its own tab, where the microphone works.
+      const url = new URL(window.location.href);
+      url.searchParams.delete('embed');
+      window.open(url.toString(), '_blank', 'noopener');
       return;
     }
     session.startCall();

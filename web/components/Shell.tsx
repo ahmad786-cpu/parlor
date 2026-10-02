@@ -16,6 +16,10 @@ export function Shell({ children }: { children: React.ReactNode }) {
 
   // Anyone holding a share link can open the demo without an account.
   const publicDemo = pathname === '/dashboard/personality-demo' && params.has('token');
+  // Embedded in another site: just the conversation, no Parlor header or page padding.
+  if (publicDemo && params.get('embed') === '1') {
+    return <main className="bare-main embed">{children}</main>;
+  }
   if (publicDemo) {
     return (
       <div className="bare">
