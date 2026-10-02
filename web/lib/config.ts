@@ -1,6 +1,3 @@
-export const API_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000').replace(/\/+$/, '');
-export const WS_URL = `${API_URL.replace(/^http/, 'ws')}/ws`;
-
 export const CATEGORIES = ['Companion', 'Education', 'Games', 'Home', 'Role play', 'Work', 'Other'];
 
 export const COLORS = ['#4A3FD6', '#2F7DD1', '#0E8F7E', '#3C8A3F', '#E08A1E', '#C2452D', '#D9367A', '#7A4FBF'];

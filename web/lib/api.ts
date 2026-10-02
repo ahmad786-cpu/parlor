@@ -1,11 +1,10 @@
-import { API_URL } from './config';
-
 type Options = { method?: string; body?: unknown; token?: string | null };
 
+// Calls this app's own API routes (app/api).
 export async function api<T>(path: string, opts: Options = {}): Promise<T> {
   let res: Response;
   try {
-    res = await fetch(`${API_URL}/api${path}`, {
+    res = await fetch(`/api${path}`, {
       method: opts.method || 'GET',
       headers: {
         ...(opts.body !== undefined ? { 'Content-Type': 'application/json' } : {}),
@@ -14,7 +13,7 @@ export async function api<T>(path: string, opts: Options = {}): Promise<T> {
       body: opts.body !== undefined ? JSON.stringify(opts.body) : undefined,
     });
   } catch {
-    throw new Error(`Can't reach the server at ${API_URL}. Check that it is running.`);
+    throw new Error(`Can't reach the server. Check your connection and try again.`);
   }
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.error || `Request failed (${res.status}).`);

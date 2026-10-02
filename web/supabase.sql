@@ -1,6 +1,6 @@
--- Run once in Supabase: SQL Editor > New query > paste > Run.
--- The server reads and writes these tables with the service role key. Row level security is on with
--- no policies, so the public (anon) key that ships to browsers cannot read or change anything.
+-- Run once in Supabase: SQL Editor > New query > paste > Run. Safe to run again.
+-- The app's API routes use the service role key. Row level security is on with no policies,
+-- so the public (anon) key that ships to browsers cannot read or change anything.
 
 create table if not exists personalities (
   id text primary key,
@@ -19,5 +19,13 @@ create table if not exists conversations (
 );
 create index if not exists conversations_visible_idx on conversations (visible_to, updated_at desc);
 
+-- One row per message, for the per-IP message limit (serverless instances share no memory).
+create table if not exists rate_events (
+  ip text not null,
+  at bigint not null
+);
+create index if not exists rate_events_ip_idx on rate_events (ip, at);
+
 alter table personalities enable row level security;
 alter table conversations enable row level security;
+alter table rate_events enable row level security;

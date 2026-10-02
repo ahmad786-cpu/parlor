@@ -1,7 +1,10 @@
-// Featured personalities ship with the server and are available to everyone.
-const voice = (lang = 'en-US', rate = 1, pitch = 1) => ({ name: '', lang, rate, pitch });
+import type { Voice } from '../types';
+import type { StoredPersonality } from './types';
 
-export const FEATURED = [
+// Featured personalities ship with the app and are available to everyone.
+const voice = (lang = 'en-US', rate = 1, pitch = 1): Voice => ({ name: '', lang, rate, pitch });
+
+export const FEATURED: StoredPersonality[] = [
   {
     id: 'featured-mira',
     name: 'Mira',
