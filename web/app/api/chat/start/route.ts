@@ -3,6 +3,7 @@ import { authenticate } from '@/lib/server/auth';
 import { HttpError, json, readJson, route } from '@/lib/server/http';
 import { findById, findByToken, toPublic } from '@/lib/server/personalities';
 import { store } from '@/lib/server/store';
+import { serverVoiceFor } from '@/lib/server/tts';
 import type { StoredConversation, StoredPersonality } from '@/lib/server/types';
 
 /*
@@ -39,5 +40,11 @@ export const POST = route(async (req: Request) => {
     updatedAt: now,
   };
   await store.saveConversation(conversation);
-  return json({ conversationId: conversation.id, personality: toPublic(found), greeting: found.greeting || '' });
+  return json({
+    conversationId: conversation.id,
+    personality: toPublic(found),
+    greeting: found.greeting || '',
+    // The browser asks /api/tts for audio instead of using its own voices.
+    serverVoice: Boolean(serverVoiceFor(found)),
+  });
 });

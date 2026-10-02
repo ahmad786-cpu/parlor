@@ -15,6 +15,9 @@ export type SessionStatus =
 
 type Target = { token?: string; personalityId?: string };
 
+// A 44-byte silent WAV, played during the click that starts a call to unlock audio on phones.
+const SILENT_WAV = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=';
+
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 /**
@@ -50,7 +53,14 @@ export function useVoiceSession(target: Target, getToken: () => Promise<string |
     queued: [] as string[], // text typed before the conversation was open
     conversationId: '',
     reply: null as AbortController | null, // the reply request in flight
+    serverVoice: false, // speak with audio from /api/tts instead of the browser's voices
+    chain: Promise.resolve() as Promise<void>, // server-voice sentences, played in order
+    ttsAbort: new AbortController(), // cancels sentence downloads on interrupt
+    stopAudio: null as (() => void) | null, // stops the sentence playing now
+    firstSpoken: false, // server voice: this reply's first sentence has been sent
+    later: [] as string[], // server voice: sentences held until the reply ends
   });
+  const audio = useRef<HTMLAudioElement | null>(null);
 
   function go(next: SessionStatus) {
     s.current.status = next;
@@ -120,9 +130,112 @@ export function useVoiceSession(target: Target, getToken: () => Promise<string |
     try { r.start(); } catch { /* start() throws if called twice; onend will retry */ }
   }
 
+  // --- Server voice: the same voice on every device. Sentences are fetched as soon as they are
+  // complete (so the next one is ready while the current one plays) and played strictly in order.
+  async function fetchSpeech(text: string): Promise<string | null> {
+    const st = s.current;
+    try {
+      const res = await fetch('/api/tts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ conversationId: st.conversationId, text }),
+        signal: st.ttsAbort.signal,
+      });
+      if (!res.ok) {
+        // Not a rate limit: the voice is unavailable, so stop asking for the rest of this conversation.
+        if (res.status !== 429) st.serverVoice = false;
+        return null;
+      }
+      return URL.createObjectURL(await res.blob());
+    } catch {
+      return null;
+    }
+  }
+
+  function playUrl(url: string): Promise<void> {
+    return new Promise((resolve) => {
+      const el = audio.current;
+      if (!el) return resolve();
+      const done = () => {
+        el.onended = null;
+        el.onerror = null;
+        s.current.stopAudio = null;
+        URL.revokeObjectURL(url);
+        resolve();
+      };
+      s.current.stopAudio = () => {
+        el.pause();
+        done();
+      };
+      el.onended = done;
+      el.onerror = done;
+      el.src = url;
+      el.play().catch(done);
+    });
+  }
+
+  // Browser voice as a promise; used when a sentence could not be fetched from the server.
+  function browserSay(text: string): Promise<void> {
+    return new Promise((resolve) => {
+      if (!canSpeak()) return resolve();
+      const u = makeUtterance(text, s.current.voiceCfg);
+      u.onend = () => resolve();
+      u.onerror = () => resolve();
+      window.speechSynthesis.speak(u);
+    });
+  }
+
+  function speakServer(text: string) {
+    const st = s.current;
+    const gen = st.gen;
+    st.pending++;
+    const audioUrl = fetchSpeech(text); // starts now, in parallel with earlier sentences playing
+    st.chain = st.chain
+      .then(async () => {
+        if (gen !== s.current.gen) return;
+        const url = await audioUrl;
+        if (gen !== s.current.gen) {
+          if (url) URL.revokeObjectURL(url);
+          return;
+        }
+        if (url) await playUrl(url);
+        else await browserSay(text);
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (gen !== s.current.gen) return;
+        s.current.pending--;
+        settle();
+      });
+  }
+
+  // Stops whatever is being said, from either voice, and drops sentences still waiting.
+  function cancelSpeech() {
+    const st = s.current;
+    st.gen++;
+    st.pending = 0;
+    st.ttsAbort.abort();
+    st.ttsAbort = new AbortController();
+    st.chain = Promise.resolve();
+    st.later = [];
+    st.firstSpoken = false;
+    st.stopAudio?.();
+    if (canSpeak()) window.speechSynthesis.cancel();
+  }
+
+  // Phones only let a page play audio after a tap, so the audio element is unlocked during the click.
+  function unlockAudio() {
+    if (typeof Audio === 'undefined') return;
+    audio.current ??= new Audio();
+    audio.current.src = SILENT_WAV;
+    audio.current.play().catch(() => {});
+  }
+
   function speak(text: string) {
     const clean = text.trim();
-    if (!clean || !canSpeak()) return;
+    if (!clean) return;
+    if (s.current.serverVoice && audio.current) return speakServer(clean);
+    if (!canSpeak()) return;
     const st = s.current;
     const u = makeUtterance(clean, st.voiceCfg);
     const gen = st.gen;
@@ -155,6 +268,8 @@ export function useVoiceSession(target: Target, getToken: () => Promise<string |
     st.streamDone = false;
     st.dropDeltas = false;
     st.buffer = '';
+    st.later = [];
+    st.firstSpoken = false;
     go('thinking');
     void streamReply(text);
   }
@@ -171,13 +286,14 @@ export function useVoiceSession(target: Target, getToken: () => Promise<string |
       return last && last.role === 'assistant' && !last.content ? m.slice(0, -1) : m;
     });
 
-  function onReady(conversationId: string, voiceCfg: Voice, greeting: string) {
+  function onReady(conversationId: string, voiceCfg: Voice, greeting: string, serverVoice: boolean) {
     const st = s.current;
     st.active = true;
     st.connecting = false;
     st.streamDone = true;
     st.conversationId = conversationId;
     st.voiceCfg = voiceCfg;
+    st.serverVoice = serverVoice;
     setMessages(greeting ? [{ role: 'assistant', content: greeting }] : []);
     if (st.voice && greeting && !st.queued.length) {
       go('speaking');
@@ -194,14 +310,26 @@ export function useVoiceSession(target: Target, getToken: () => Promise<string |
     if (st.voice) {
       const [sentences, rest] = takeSentences(st.buffer + text);
       st.buffer = rest;
-      sentences.forEach(speak);
+      if (!st.serverVoice) return sentences.forEach(speak);
+      // Server voice: the first sentence is spoken at once so speech starts quickly; the rest of the
+      // reply goes in one request when it ends (the provider's free tier counts requests, not length).
+      for (const sentence of sentences) {
+        if (!st.firstSpoken) {
+          st.firstSpoken = true;
+          speak(sentence);
+        } else {
+          st.later.push(sentence);
+        }
+      }
     }
   }
 
   function onDone() {
     const st = s.current;
-    if (st.voice && !st.dropDeltas) speak(st.buffer);
+    if (st.voice && !st.dropDeltas) speak([...st.later, st.buffer].join(' '));
     st.buffer = '';
+    st.later = [];
+    st.firstSpoken = false;
     st.dropDeltas = false;
     st.streamDone = true;
     dropEmptyReply();
@@ -262,11 +390,12 @@ export function useVoiceSession(target: Target, getToken: () => Promise<string |
     setInCall(voice);
     setError('');
     go('connecting');
-    // Speech must be unlocked from the click itself, before any await.
+    // Speech and audio must be unlocked from the click itself, before any await.
     if (voice && canSpeak()) {
       window.speechSynthesis.cancel();
       window.speechSynthesis.speak(new SpeechSynthesisUtterance(''));
     }
+    if (voice) unlockAudio();
     const session = st.session;
     const stale = () => session !== s.current.session;
     try {
@@ -280,7 +409,7 @@ export function useVoiceSession(target: Target, getToken: () => Promise<string |
       const data = await res.json().catch(() => ({}));
       if (stale()) return;
       if (!res.ok) throw new Error(data.error || `Could not start the conversation (${res.status}).`);
-      onReady(data.conversationId, data.personality.voice, data.greeting || '');
+      onReady(data.conversationId, data.personality.voice, data.greeting || '', Boolean(data.serverVoice));
     } catch (err) {
       if (stale()) return;
       teardown();
@@ -293,8 +422,7 @@ export function useVoiceSession(target: Target, getToken: () => Promise<string |
     const st = s.current;
     stopRecognition();
     st.session++;
-    st.gen++;
-    st.pending = 0;
+    cancelSpeech();
     st.buffer = '';
     st.active = false;
     st.connecting = false;
@@ -304,7 +432,7 @@ export function useVoiceSession(target: Target, getToken: () => Promise<string |
     st.conversationId = '';
     st.reply?.abort();
     st.reply = null;
-    if (canSpeak()) window.speechSynthesis.cancel();
+    st.serverVoice = false;
     setInCall(false);
     dropEmptyReply();
   }
@@ -313,6 +441,7 @@ export function useVoiceSession(target: Target, getToken: () => Promise<string |
   function startCall() {
     const st = s.current;
     if (!st.active) return void connect(true);
+    unlockAudio();
     st.voice = true;
     setInCall(true);
     settle();
@@ -331,10 +460,8 @@ export function useVoiceSession(target: Target, getToken: () => Promise<string |
   /** Stop the personality mid-reply and hand the turn back. */
   function interrupt() {
     const st = s.current;
-    st.gen++;
-    st.pending = 0;
+    cancelSpeech();
     st.buffer = '';
-    if (canSpeak()) window.speechSynthesis.cancel();
     if (!st.streamDone) {
       st.dropDeltas = true;
       st.reply?.abort(); // streamReply then finishes the turn
