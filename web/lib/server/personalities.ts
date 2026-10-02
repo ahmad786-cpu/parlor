@@ -3,6 +3,7 @@ import { CATEGORIES } from '../config';
 import { HttpError } from './http';
 import { FEATURED } from './seed';
 import { store } from './store';
+import type { VoiceGender } from '../types';
 import type { StoredPersonality } from './types';
 
 const str = (v: unknown, max: number) => (typeof v === 'string' ? v.trim().slice(0, max) : '');
@@ -34,6 +35,7 @@ export function sanitize(input: Record<string, unknown>) {
       lang: /^[a-zA-Z]{2,3}(-[a-zA-Z0-9]{2,4})?$/.test(lang) ? lang : 'en-US',
       rate: num(v.rate, 0.5, 2, 1),
       pitch: num(v.pitch, 0, 2, 1),
+      gender: (v.gender === 'male' || v.gender === 'female' ? v.gender : 'any') as VoiceGender,
     },
   };
 }

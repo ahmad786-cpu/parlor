@@ -1,3 +1,4 @@
+import { LANGUAGES } from '../config';
 import { llmConfigured, serverConfig } from './env';
 import type { StoredPersonality } from './types';
 
@@ -11,7 +12,10 @@ const VOICE_RULES = [
 ].join(' ');
 
 export function buildSystemPrompt(p: StoredPersonality): string {
-  return `Your name is ${p.name}.\n\n${p.prompt}\n\n${VOICE_RULES}\nReply in the language the person speaks to you in (default: ${p.voice?.lang || 'en-US'}).`;
+  const code = p.voice?.lang || 'en-US';
+  // "English (US)" -> "English". The voice can only speak this language, so replies always use it.
+  const language = (LANGUAGES.find((l) => l.code === code)?.label || code).replace(/\s*\(.*\)$/, '');
+  return `Your name is ${p.name}.\n\n${p.prompt}\n\n${VOICE_RULES}\nAlways reply in ${language}, even if the person writes or speaks in another language; your voice can only speak ${language}.`;
 }
 
 // Yields text chunks from any OpenAI-compatible /chat/completions endpoint.

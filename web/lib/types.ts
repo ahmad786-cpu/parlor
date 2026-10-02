@@ -1,4 +1,6 @@
-export type Voice = { name: string; lang: string; rate: number; pitch: number };
+export type VoiceGender = 'any' | 'male' | 'female';
+
+export type Voice = { name: string; lang: string; rate: number; pitch: number; gender?: VoiceGender };
 
 export type Personality = {
   id: string;

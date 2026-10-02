@@ -5,8 +5,8 @@ import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { CATEGORIES, COLORS, LANGUAGES } from '@/lib/config';
-import { canSpeak, makeUtterance } from '@/lib/speech';
-import type { Personality, PersonalityInput } from '@/lib/types';
+import { canSpeak, makeUtterance, voiceGender } from '@/lib/speech';
+import type { Personality, PersonalityInput, VoiceGender } from '@/lib/types';
 import { Avatar } from './Avatar';
 
 const BLANK: PersonalityInput = {
@@ -17,7 +17,7 @@ const BLANK: PersonalityInput = {
   category: 'Companion',
   emoji: '🙂',
   color: COLORS[0],
-  voice: { name: '', lang: 'en-US', rate: 1, pitch: 1 },
+  voice: { name: '', lang: 'en-US', rate: 1, pitch: 1, gender: 'any' },
 };
 
 export function PersonalityForm({ existing }: { existing?: Personality }) {
@@ -39,10 +39,13 @@ export function PersonalityForm({ existing }: { existing?: Personality }) {
     return () => window.speechSynthesis.removeEventListener('voiceschanged', load);
   }, []);
 
+  // Voices in the chosen language, without ones known to be the other gender when a type is chosen.
+  const gender: VoiceGender = form.voice.gender || 'any';
   const langVoices = useMemo(() => {
     const base = form.voice.lang.split('-')[0].toLowerCase();
-    return voices.filter((v) => v.lang.toLowerCase().startsWith(base));
-  }, [voices, form.voice.lang]);
+    const opposite = gender === 'male' ? 'female' : gender === 'female' ? 'male' : null;
+    return voices.filter((v) => v.lang.toLowerCase().startsWith(base) && voiceGender(v) !== opposite);
+  }, [voices, form.voice.lang, gender]);
 
   const set = <K extends keyof PersonalityInput>(key: K, value: PersonalityInput[K]) =>
     setForm((f) => ({ ...f, [key]: value }));
@@ -154,6 +157,14 @@ export function PersonalityForm({ existing }: { existing?: Personality }) {
             </select>
           </label>
           <label>
+            Voice type
+            <select value={gender} onChange={(e) => setVoice({ gender: e.target.value as VoiceGender, name: '' })}>
+              <option value="any">Any</option>
+              <option value="male">Male</option>
+              <option value="female">Female</option>
+            </select>
+          </label>
+          <label>
             Voice
             <select value={form.voice.name} onChange={(e) => setVoice({ name: e.target.value })}>
               <option value="">Best available</option>
@@ -162,7 +173,7 @@ export function PersonalityForm({ existing }: { existing?: Personality }) {
           </label>
         </div>
         <small>
-          Voices come from the listener's browser. If theirs doesn't have the one you chose, they hear the closest voice in the same language.
+          Voices come from the listener's browser. If theirs doesn't have the one you chose, they hear the closest voice of the same type in the same language. The personality always replies in this language.
         </small>
         <div className="form-grid">
           <label>
