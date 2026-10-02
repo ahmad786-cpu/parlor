@@ -1,0 +1,28 @@
+# Render blueprint for the API + WebSocket server. Render > New > Blueprint > pick this repo.
+# Values marked sync: false are asked for once in the Render dashboard; they are never stored here.
+services:
+  - type: web
+    name: parlor-server
+    runtime: node
+    rootDir: server
+    plan: free
+    buildCommand: npm ci
+    startCommand: npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: TRUST_PROXY
+        value: "1"
+      - key: WEB_ORIGIN
+        sync: false
+      - key: LLM_BASE_URL
+        sync: false
+      - key: LLM_API_KEY
+        sync: false
+      - key: LLM_MODEL
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
