@@ -32,12 +32,30 @@ export default function PersonalityDemo() {
   const [voiceInput, setVoiceInput] = useState(true);
   const [draft, setDraft] = useState('');
   const [shareToken, setShareToken] = useState('');
+  // Embedded in another site (e.g. a portfolio): browsers often block the microphone in frames,
+  // so calls open this page in its own tab while typing stays in place.
+  const [embedded, setEmbedded] = useState(false);
   const logEnd = useRef<HTMLDivElement>(null);
 
   const session = useVoiceSession(token ? { token } : { personalityId: id }, getToken);
   const { status, messages, interim, inCall, muted } = session;
 
-  useEffect(() => setVoiceInput(Boolean(recognitionCtor())), []);
+  useEffect(() => {
+    setVoiceInput(Boolean(recognitionCtor()));
+    try {
+      setEmbedded(window.self !== window.top);
+    } catch {
+      setEmbedded(true); // reading window.top across origins can throw
+    }
+  }, []);
+
+  function startCall() {
+    if (embedded) {
+      window.open(window.location.href, '_blank', 'noopener');
+      return;
+    }
+    session.startCall();
+  }
 
   useEffect(() => {
     let live = true;
@@ -99,8 +117,13 @@ export default function PersonalityDemo() {
 
         <div className="stage-controls">
           {!inCall && (
-            <button className="btn call" onClick={session.startCall} disabled={!voiceInput || status === 'connecting'}>
-              Start call
+            <button
+              className="btn call"
+              onClick={startCall}
+              disabled={!voiceInput || status === 'connecting'}
+              title={embedded ? 'Opens the call in a new tab, where the microphone works' : undefined}
+            >
+              {embedded ? 'Start call ↗' : 'Start call'}
             </button>
           )}
           {inCall && (
@@ -117,6 +140,9 @@ export default function PersonalityDemo() {
         </div>
         {!voiceInput && (
           <p className="stage-note">This browser can't take voice input. Open the page in Chrome or Edge to call, or type instead.</p>
+        )}
+        {voiceInput && embedded && !inCall && (
+          <p className="stage-note">Calls open in a new tab so your microphone works. Typing works right here.</p>
         )}
       </section>
 

@@ -86,12 +86,23 @@ export function useVoiceSession(target: Target, getToken: () => Promise<string |
       setInterim(live);
     };
     r.onerror = (e: any) => {
-      if (e.error === 'not-allowed' || e.error === 'service-not-allowed') {
-        setError('Microphone access is blocked. Allow it in your browser settings, or type your message instead.');
-        s.current.voice = false;
-        setInCall(false);
-        if (s.current.active) go('ready');
-      }
+      // Silence and our own aborts are normal; onend restarts listening.
+      if (e.error === 'no-speech' || e.error === 'aborted') return;
+      const reasons: Record<string, string> = {
+        'not-allowed': 'Microphone access is blocked. Allow it in your browser settings, or type your message instead.',
+        'service-not-allowed': 'This browser does not allow speech recognition here. Open the page in Chrome or Edge, or type instead.',
+        'audio-capture': 'No microphone was found. Connect one, or type your message instead.',
+        network: "Voice input needs the browser's online speech service, which could not be reached. Check your connection, or type instead.",
+        'language-not-supported': "This browser can't understand this personality's language by voice. Type your message instead.",
+      };
+      setError(reasons[e.error] || `Voice input stopped (${e.error}). Type your message instead.`);
+      // Leave call mode so it does not keep retrying in silence.
+      r.onend = null;
+      if (recog.current === r) recog.current = null;
+      setInterim('');
+      s.current.voice = false;
+      setInCall(false);
+      if (s.current.active && s.current.status === 'listening') go('ready');
     };
     r.onend = () => {
       if (recog.current !== r) return;
