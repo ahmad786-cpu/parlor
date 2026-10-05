@@ -7,6 +7,7 @@ import { useAuth } from '@/lib/auth';
 const NAV = [
   { href: '/dashboard', label: 'Personalities' },
   { href: '/dashboard/history', label: 'History' },
+  { href: '/dashboard/voice-studio', label: 'Voice Studio' },
 ];
 
 export function Shell({ children }: { children: React.ReactNode }) {
